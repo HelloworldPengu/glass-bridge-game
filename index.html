@@ -1,1 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>오징어 게임 - 징검다리</title>
+  <style>
+    body {
+      margin: 0;
+      background: radial-gradient(ellipse at center, #111 0%, #000 100%);
+      color: white;
+      font-family: 'Arial', sans-serif;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin-top: 20px;
+      font-size: 32px;
+      color: #ff3366;
+      text-shadow: 0 0 10px #ff3366;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 400px;
+      overflow: hidden;
+      margin-top: 30px;
+    }
+
+    .step {
+      position: absolute;
+      top: 100%;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      transition: transform 0.6s ease-in, opacity 0.6s ease-in;
+      opacity: 0;
+      align-items: center;
+    }
+
+    .step.active {
+      transform: translateY(-300px);
+      opacity: 1;
+    }
+
+    .step.previous {
+      transform: translateY(-600px);
+      opacity: 0;
+    }
+
+    .glass-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .pink-bar {
+      width: 10px;
+      height: 260px;
+      background: #ff69b4;
+      box-shadow: 0 0 10px #ff69b4;
+    }
+
+    .side-bar {
+      width: 10px;
+      height: 260px;
+      background: #ff69b4;
+      margin: 0 5px;
+      box-shadow: 0 0 10px #ff69b4;
+    }
+
+    .glass {
+      width: 100px;
+      height: 160px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(200, 200, 255, 0.5);
+      border-radius: 12px;
+      backdrop-filter: blur(4px);
+      box-shadow:
+        inset 0 0 30px rgba(255, 255, 255, 0.2),
+        0 0 15px rgba(255, 0, 255, 0.5),
+        0 4px 12px rgba(0, 0, 0, 0.6);
+      transition: all 0.3s;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-shadow: 0 0 5px black;
+      position: relative;
+    }
+
+    .glass.correct {
+      background: #5efc82;
+    }
+
+    .glass.wrong {
+      animation: explode 0.6s forwards;
+    }
+
+    @keyframes explode {
+      0% { transform: scale(1); opacity: 1; }
+      20% { transform: rotate(10deg) scale(1.1); opacity: 0.9; }
+      40% { transform: rotate(-20deg) scale(1.2); opacity: 0.6; }
+      60% { transform: rotate(25deg) scale(1.3); opacity: 0.3; }
+      100% { transform: rotate(-45deg) scale(0); opacity: 0; filter: blur(4px); }
+    }
+
+    #status {
+      font-size: 28px;
+      margin-top: 30px;
+    }
+
+    #restartBtn {
+      margin-top: 20px;
+      padding: 10px 25px;
+      font-size: 18px;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      display: none;
+    }
+
+    .finish-line {
+      width: 100%;
+      height: 5px;
+      background: repeating-linear-gradient(90deg, red, red 10px, white 10px, white 20px);
+      margin-top: 30px;
+      box-shadow: 0 0 20px red;
+    }
+  </style>
+</head>
+<body>
+  <h1>🦑 징검다리 생존 게임</h1>
+  <p>진짜 유리를 골라 공중 다리를 건너세요!</p>
+
+  <div id="game-container"></div>
+  <div class="finish-line" id="finishLine" style="display:none;"></div>
+  <div id="status"></div>
+  <button id="restartBtn" onclick="startGame()">다시 시작</button>
+
+  <audio id="breakSound" src="https://www.soundjay.com/mechanical/glass-breaking-01.mp3"></audio>
+  <audio id="winSound" src="https://www.soundjay.com/human/applause-01.mp3"></audio>
+
+  <script>
+    const TOTAL_STEPS = 10;
+    let path = [];
+    let currentStep = 0;
+    let gameOver = false;
+    let stepElements = [];
+
+    function startGame() {
+      path = Array.from({ length: TOTAL_STEPS }, () => Math.floor(Math.random() * 2));
+      currentStep = 0;
+      gameOver = false;
+      stepElements = [];
+      document.getElementById("status").textContent = "";
+      document.getElementById("restartBtn").style.display = "none";
+      document.getElementById("game-container").innerHTML = "";
+      document.getElementById("finishLine").style.display = "none";
+
+      renderStep();
+    }
+
+    function renderStep() {
+      const container = document.getElementById("game-container");
+      const stepDiv = document.createElement('div');
+      stepDiv.className = 'step';
+
+      const left = document.createElement('div');
+      left.className = 'glass-container';
+      const leftSide = document.createElement('div');
+      leftSide.className = 'side-bar';
+      const leftGlass = document.createElement('div');
+      leftGlass.className = 'glass';
+      leftGlass.textContent = '유리';
+      leftGlass.onclick = () => handleClick(0, leftGlass, stepDiv);
+      left.appendChild(leftSide);
+      left.appendChild(leftGlass);
+
+      const bar = document.createElement('div');
+      bar.className = 'pink-bar';
+
+      const right = document.createElement('div');
+      right.className = 'glass-container';
+      const rightGlass = document.createElement('div');
+      rightGlass.className = 'glass';
+      rightGlass.textContent = '유리';
+      rightGlass.onclick = () => handleClick(1, rightGlass, stepDiv);
+      const rightSide = document.createElement('div');
+      rightSide.className = 'side-bar';
+      right.appendChild(rightGlass);
+      right.appendChild(rightSide);
+
+      stepDiv.appendChild(left);
+      stepDiv.appendChild(bar);
+      stepDiv.appendChild(right);
+
+      container.appendChild(stepDiv);
+      stepElements.push(stepDiv);
+
+      setTimeout(() => {
+        stepDiv.classList.add('active');
+        if (stepElements.length > 1) {
+          stepElements[stepElements.length - 2].classList.add('previous');
+        }
+      }, 50);
+    }
+
+    function handleClick(side, glassElement, stepDiv) {
+      if (gameOver) return;
+      const correct = path[currentStep];
+      const allGlass = stepDiv.querySelectorAll('.glass');
+
+      allGlass.forEach(g => g.onclick = null);
+
+      if (side === correct) {
+        glassElement.classList.add("correct");
+        currentStep++;
+
+        if (currentStep === TOTAL_STEPS) {
+          document.getElementById("status").textContent = "🎉 성공! 모두 건넜습니다!";
+          document.getElementById("restartBtn").style.display = "inline-block";
+          document.getElementById("finishLine").style.display = "block";
+          document.getElementById("winSound").play();
+        } else {
+          setTimeout(() => renderStep(), 800);
+        }
+      } else {
+        document.getElementById("breakSound").play();
+        glassElement.classList.add("wrong");
+        document.getElementById("status").textContent = "💥 실패! 유리가 깨졌습니다!";
+        document.getElementById("restartBtn").style.display = "inline-block";
+        gameOver = true;
+      }
+    }
+
+    startGame();
+  </script>
+</body>
+</html>
 
